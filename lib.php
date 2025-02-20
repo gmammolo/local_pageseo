@@ -90,10 +90,13 @@ function local_pageseo_metch_urls($currentUrl, $pageSeoUrl) {
 
     $matching = $infoCurrentUrl['base'] == $infoPageSeoUrl['base'] && $infoCurrentUrl['path'] == $infoPageSeoUrl['path'];
 
-    // categoryID è un parametro discriminante per i vari corsi.
-    if ($matching && isset($infoCurrentUrl['query']['categoryid']) && isset($infoPageSeoUrl['query']['categoryid'])) {
-        $matching = $infoCurrentUrl['query']['categoryid'] == ($infoPageSeoUrl['query']['categoryid']);
+    $selectiveQueryParams = ['categoryid', 'section'];
+    foreach ($selectiveQueryParams as $param) {
+        if ($matching && isset($infoCurrentUrl['query'][$param]) && isset($infoPageSeoUrl['query'][$param])) {
+            $matching = $infoCurrentUrl['query'][$param] == ($infoPageSeoUrl['query'][$param]);
+        }
     }
+    
     return $matching;
 }
 
@@ -126,7 +129,7 @@ function local_pageseo_before_http_headers() {
         if (local_pageseo_metch_urls($currenturl, $tuple->url)) {
             $PAGE->set_title(trim($tuple->title));
             //$PAGE->set_description(trim($tuple->description));
-            $PAGE->add_meta_tag('description',trim($tuple->description));
+            //$PAGE->add_meta_tag('description',trim($tuple->description));
             
             return;
         }
