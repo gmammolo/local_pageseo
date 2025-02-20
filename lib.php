@@ -24,6 +24,88 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * Extracts information from a given URL.
+ *
+ * This function parses the provided URL and extracts its components,
+ * including the base URL, path segments, query string, and fragment.
+ *
+ * @param string $url The URL to be parsed.
+ * 
+ * @return array An associative array containing the following keys:
+ * - 'base': The base URL (scheme and host).
+ * - 'path': An array of path segments.
+ * - 'query': An associative array of query parameters.
+ * - 'fragment': The URL fragment, if present.
+ *
+ * @example
+ * $url = 'https://moodle.org/mod/page/view.php?id=123&chapter=4#section2';
+ * $result = local_pageseo_extract_url_info($url);
+ * // $result will be:
+ * // [
+ * //     'base' => 'https://moodle.org',
+ * //     'path' => ['mod', 'page', 'view.php'],
+ * //     'query' => ['id' => '123', 'chapter' => '4'],
+ * //     'fragment' => 'section2'
+ * // ]
+ */
+function local_pageseo_extract_url_info($url) {
+    $url = parse_url($url);
+
+    $path = $url['path'];
+    $path = explode('/', $path);
+    $path = array_filter($path);
+
+    $path = array_values($path);
+
+    $path = array_map(function($part) {
+        return urldecode($part);
+    }, $path);
+
+    // Parse the query string into an associative array
+    parse_str($url['query'] ?? '', $queryArray);
+
+    return [
+        'base' => $url['scheme'] . '://' . $url['host'],
+        'path' => $path,
+        'query' => $queryArray,
+        'fragment' => $url['fragment'] ?? ''
+    ];
+}
+
+
+/**
+ * Compares two URLs to determine if they match based on their base, path, and category ID.
+ *
+ * This function extracts information from the provided URLs and checks if their base and path are identical.
+ * Additionally, if both URLs contain a 'categoryid' query parameter, it checks if these parameters are equal.
+ *
+ * @param string $currentUrl The current URL to be compared.
+ * @param string $pageSeoUrl The SEO URL to be compared.
+ * @return bool Returns true if the URLs match based on the criteria; otherwise, false.
+ */
+function local_pageseo_metch_urls($currentUrl, $pageSeoUrl) {
+    $infoCurrentUrl = local_pageseo_extract_url_info($currentUrl);
+    $infoPageSeoUrl = local_pageseo_extract_url_info($pageSeoUrl);
+
+    $matching = $infoCurrentUrl['base'] == $infoPageSeoUrl['base'] && $infoCurrentUrl['path'] == $infoPageSeoUrl['path'];
+
+    // categoryID è un parametro discriminante per i vari corsi.
+    if ($matching && isset($infoCurrentUrl['query']['categoryid']) && isset($infoPageSeoUrl['query']['categoryid'])) {
+        $matching = $infoCurrentUrl['query']['categoryid'] == ($infoPageSeoUrl['query']['categoryid']);
+    }
+    return $matching;
+}
+
+
+
+
+
+
+
+
+
+
 function local_pageseo_before_http_headers() {
     global $DB, $PAGE;
 
@@ -39,18 +121,19 @@ function local_pageseo_before_http_headers() {
         return;
     }
 
-    // creaqte un mock di $urls
-    if ($urls) {
-        foreach ($urls as $tuple) {
-            if (trim($tuple->url) == $currenturl) {
-                //$PAGE->set_title(trim($tuple->title));
-                //$PAGE->set_heading(trim($tuple->title));
-                //$PAGE->set_description(trim($tuple->description));
-                //break;
-            }
+    foreach ($urls as $tuple) {
+
+        if (local_pageseo_metch_urls($currenturl, $tuple->url)) {
+            $PAGE->set_title(trim($tuple->title));
+            //$PAGE->set_description(trim($tuple->description));
+            $PAGE->add_meta_tag('description',trim($tuple->description));
+            
+            return;
         }
     }
 }
+
+
 
 // Registra l'evento
 $observers = [
